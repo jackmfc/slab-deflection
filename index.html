@@ -108,6 +108,18 @@
         <div class="field"><label>Long span L<sub>y</sub> (m)</label><input id="Ly" type="number" step="any" value="6.0"></div>
         <div class="field"><label>Load share to short span</label><input id="gamma" type="number" step="any" value=""><div class="hint">Blank = auto Ly⁴/(Lx⁴+Ly⁴).</div></div>
       </div>
+      <div class="row three twoway" id="cantRow">
+        <div class="field"><label>Cantilever span L<sub>c</sub> (m)</label><input id="Lc" type="number" step="any" value="1.5"><div class="hint">Clear projection (used as L<sub>ef</sub>).</div></div>
+        <div class="field"><label>Backspan length L<sub>b</sub> (m) <span class="pill">optional</span></label><input id="Lb" type="number" step="any" value=""><div class="hint">Adjacent span. Blank = ignore backspan rotation.</div></div>
+        <div class="field">
+          <label>Backspan effect</label>
+          <select id="bsType"><option value="cont">Continuous backspan (auto θ)</option><option value="theta">Enter support rotation θ</option><option value="none">Ignore (tip bending only)</option></select>
+          <div class="hint">Backspan load rotates the support, moving the tip.</div>
+        </div>
+      </div>
+      <div class="row" id="thetaRow" style="display:none">
+        <div class="field"><label>Support rotation θ (×10⁻³ rad)</label><input id="theta" type="number" step="any" value="0"><div class="hint">From your frame analysis; tip moves θ·L<sub>c</sub> (sagging +).</div></div>
+      </div>
     </div>
 
     <div class="card">
@@ -224,13 +236,16 @@ const SUPPORT = {
 
 // UI wiring
 function syncMember(){
-  const m=$("member").value;
-  $("twowayRow").style.display = m==="twoway" ? "grid" : "none";
+  const m=$("member").value, cant=$("support").value==="cant";
+  $("twowayRow").style.display = (m==="twoway" && !cant) ? "grid" : "none";
+  $("cantRow").style.display = cant ? "grid" : "none";
+  $("thetaRow").style.display = (cant && $("bsType").value==="theta") ? "grid" : "none";
   const unit = m==="beam" ? "(kN/m)" : "(kPa)";
   $("loadUnit1").textContent=unit; $("loadUnit2").textContent=unit;
-  if(m!=="beam" && parseFloat($("b").value)!==1000 && (m==="oneway"||m==="twoway")) {} // leave b editable
 }
 $("member").addEventListener("change",()=>{ syncMember(); calc(); });
+$("support").addEventListener("change",()=>{ syncMember(); calc(); });
+$("bsType").addEventListener("change",()=>{ syncMember(); calc(); });
 $("limit").addEventListener("change",()=>{ $("customRow").style.display=$("limit").value==="custom"?"grid":"none"; calc(); });
 document.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",calc));
 $("resetBtn").addEventListener("click",()=>location.reload());
@@ -244,10 +259,13 @@ function calc(){
   let Lef=num("Lef");
   // two-way: design span = Lx
   let gamma=1;
-  if(member==="twoway"){
+  if(member==="twoway" && sup!=="cant"){
     const Lx=num("Lx"), Ly=num("Ly");
     if(Lx&&Ly){ Lef=Lx; const g=num("gamma"); gamma = (g!==null&&g>0&&g<=1)? g : Math.pow(Ly,4)/(Math.pow(Lx,4)+Math.pow(Ly,4)); }
   }
+  // cantilever: span = Lc
+  const isCant = sup==="cant";
+  if(isCant){ const lc=num("Lc"); if(lc&&lc>0) Lef=lc; }
   const b=num("b"), D=num("D"), d=num("d"), Ast=num("Ast"), Asc=num("Asc")||0, dc=num("dc")||0;
   const fc=num("fc"); let Ec=num("Ec"); const Es=num("Es")||200000;
   const uw=num("uw")||0, scs=num("scs")||0, rho=num("rho")||2400;
@@ -307,7 +325,30 @@ function calc(){
   const di_sus   = S.beta*wl*Math.pow(Lmm,4)/(Ec*Ief_sus);    // immediate, sustained
   const kcs = Math.max(0.8, 2 - 1.2*(Asc/Ast));
   const d_long = kcs*di_sus;                                  // long-term creep+shrinkage of sustained
-  const d_total = di_short + d_long;                          // total long-term deflection
+  let d_bend = di_short + d_long;                             // bending tip deflection
+
+  // cantilever support rotation contribution (tip moves by θ·Lc)
+  let d_rot=0, rotMode="", rotInfo="";
+  if(isCant){
+    const bs=$("bsType").value;
+    if(bs==="theta"){
+      const th=(num("theta")||0)/1000;                       // rad
+      d_rot = th*Lmm;                                          // tip movement = θ·Lc (total, as entered)
+      rotMode="θ entered"; rotInfo=fmt((num("theta")||0),2)+"×10⁻³ rad";
+    } else if(bs==="cont"){
+      const Lb=num("Lb");
+      if(Lb&&Lb>0){
+        const Lbmm=Lb*1000;
+        // net support rotation per load case: cantilever moment (Mc=w·Lc²/2) opens the joint (+),
+        // backspan UDL sags the backspan and rotates the tip up (−). Far end of backspan pinned.
+        const rot=(w,Ief)=>{ const Mc=w*Lmm*Lmm/2; return (Mc*Lbmm/(3*Ec*Ief)) - (w*Math.pow(Lbmm,3)/(24*Ec*Ief)); };
+        const th_s=rot(ws,Ief_short), th_l=rot(wl,Ief_sus);
+        d_rot = th_s*Lmm + kcs*(th_l*Lmm);                    // immediate + long-term, parallel to bending
+        rotMode="auto (continuous backspan)"; rotInfo="Lb="+fmt(Lb,2)+" m";
+      } else { rotMode="backspan ignored (no Lb)"; }
+    } else { rotMode="tip bending only"; }
+  }
+  const d_total = d_bend + d_rot;                             // total tip deflection
 
   // limit
   const ratio = $("limit").value==="custom" ? (num("limitN")||250) : parseFloat($("limit").value);
@@ -320,7 +361,7 @@ function calc(){
     supLabel:S.label, beta:S.beta, am:S.am, Lef, gamma, b,D,d,Ast,Asc,dc,fc,Ec,Es,n,uw,scs,rho,
     G,Q,psis,psil,incSW, Gtot,Qtot,w_short,w_sus,
     Ig,Icr,Z,yt,fctf,Mcr:Mcr/1e6,Ms_short:Ms_short/1e6,Ms_sus:Ms_sus/1e6,dn,p,IefMax,Ief_short,Ief_sus,
-    di_short,di_sus,kcs,d_long,d_total,ratio,d_allow,cracked,pass};
+    di_short,di_sus,kcs,d_long,d_bend,d_rot,isCant,rotMode,rotInfo,d_total,ratio,d_allow,cracked,pass};
   LAST=o; render(o);
 }
 
@@ -366,9 +407,13 @@ function render(o){
     ["",["Immediate δ (sustained)", fmt(o.di_sus,1)+" mm"]],
     ["",["kcs (long-term factor)", fmt(o.kcs,2)]],
     ["",["Long-term δ (kcs·δsus)", fmt(o.d_long,1)+" mm"]],
-    ["",["Total deflection δtotal", fmt(o.d_total,1)+" mm"]],
-    ["",["Allowable  L/"+o.ratio, fmt(o.d_allow,1)+" mm"]],
   ];
+  if(o.isCant){
+    rows.push(["",["Bending tip δ", fmt(o.d_bend,1)+" mm"]]);
+    rows.push(["",["Support rotation δ ("+o.rotMode+(o.rotInfo?", "+o.rotInfo:"")+")", fmt(o.d_rot,1)+" mm"]]);
+  }
+  rows.push(["",["Total "+(o.isCant?"tip ":"")+"deflection δtotal", fmt(o.d_total,1)+" mm"]]);
+  rows.push(["",["Allowable  L/"+o.ratio, fmt(o.d_allow,1)+" mm"]]);
   $("outTable").querySelector("tbody").innerHTML = rows.map(r=>{
     if(r[0]==="hd") return `<tr class="hd"><td colspan="2">${r[1]}</td></tr>`;
     return `<tr><td class="k">${r[1][0]}</td><td>${r[1][1]}</td></tr>`;
@@ -451,9 +496,11 @@ function buildPDF(o){
     ["Immediate d (sustained)", fmt(o.di_sus,2)+" mm"],
     ["kcs = 2 - 1.2(Asc/Ast) >= 0.8", fmt(o.kcs,2)],
     ["Long-term d = kcs.d_sustained", fmt(o.d_long,2)+" mm"],
-    ["TOTAL deflection d_total", fmt(o.d_total,2)+" mm"],
+    o.isCant?["Bending tip deflection", fmt(o.d_bend,2)+" mm"]:null,
+    o.isCant?["Support rotation tip movement ("+o.rotMode+(o.rotInfo?", "+o.rotInfo:"")+")", fmt(o.d_rot,2)+" mm"]:null,
+    ["TOTAL "+(o.isCant?"tip ":"")+"deflection d_total", fmt(o.d_total,2)+" mm"],
     ["Allowable  Lef / "+o.ratio, fmt(o.d_allow,2)+" mm"],
-  ],M,y,W);
+  ].filter(Boolean),M,y,W);
 
   // verdict line
   y=ensure(doc,y,16,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
@@ -462,7 +509,8 @@ function buildPDF(o){
   doc.setTextColor(20,28,38); y+=7;
 
   doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(110);
-  y=wrap(doc,"Notes: Branson effective-stiffness method per AS 3600 Cl 8.5.3.1; continuous members use the span-region service moment (AS 3600 permits averaging Ief). Two-way slabs use a short-span strip with a load-share factor — a simplified idealisation; verify by rigorous/FE analysis. Confirm sigma_cs (shrinkage), effective span, Ec, and AS 1170 load factors. g via standard formulas; this is a calculation aid, not design certification.",M,y,W-2*M,3.4);
+  const cantNote = o.isCant ? " Cantilever tip deflection = bending (d=w.Lc^4/8EcIef) plus support-rotation movement (theta.Lc); the auto continuous-backspan rotation is a simplified estimate (cantilever moment opening the joint, less backspan-UDL relief, far end pinned) — for important cantilevers enter theta from a frame analysis." : "";
+  y=wrap(doc,"Notes: Branson effective-stiffness method per AS 3600 Cl 8.5.3.1; continuous members use the span-region service moment (AS 3600 permits averaging Ief). Two-way slabs use a short-span strip with a load-share factor — a simplified idealisation; verify by rigorous/FE analysis."+cantNote+" Confirm sigma_cs (shrinkage), effective span, Ec, and AS 1170 load factors. This is a calculation aid, not design certification.",M,y,W-2*M,3.4);
 
   y=ensure(doc,y+4,26,M); doc.setDrawColor(180); doc.line(M,y+9,M+70,y+9); doc.line(right-70,y+9,right,y+9);
   doc.setFontSize(8.5); doc.setTextColor(90);
