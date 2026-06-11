@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Concrete Slab Deflection — AS 3600</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="logo.js"></script>
+<style>
+  :root{--bg:#0f1722;--panel:#16202e;--panel2:#1d2a3a;--line:#2a3a4f;--txt:#e8eef5;--muted:#9fb0c3;--accent:#3da9fc;--good:#34c77b;--bad:#ff5c6c;--warn:#ffb454;}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  header{padding:18px 28px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:650}
+  header .sub{color:var(--muted);font-size:13px}
+  .wrap{max-width:1200px;margin:0 auto;padding:22px 28px 90px;display:grid;grid-template-columns:1.18fr 0.82fr;gap:24px}
+  @media(max-width:940px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:20px}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:0 0 14px;font-weight:650}
+  .card h2 .note{text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400;font-size:12px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:0 0 4px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-bottom:12px}
+  .row.three{grid-template-columns:1fr 1fr 1fr}
+  .field{margin-bottom:0}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .sticky{position:sticky;top:22px}
+  .result-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .badge{font-weight:700;font-size:13px;padding:5px 12px;border-radius:999px}
+  .badge.pass{background:rgba(52,199,123,.16);color:var(--good);border:1px solid var(--good)}
+  .badge.fail{background:rgba(255,92,108,.16);color:var(--bad);border:1px solid var(--bad)}
+  .badge.idle{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+  table.out{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.out td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.out td:last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.out td.k{color:var(--muted)}
+  table.out tr.hd td{color:var(--accent);font-weight:650;border-bottom-color:var(--accent);padding-top:10px}
+  .check{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:var(--panel2);margin-bottom:8px;font-size:13px;border:1px solid var(--line)}
+  .check .v{font-weight:650;white-space:nowrap}
+  .check.ok{border-color:rgba(52,199,123,.5)} .check.ok .v{color:var(--good)}
+  .check.no{border-color:rgba(255,92,108,.5)} .check.no .v{color:var(--bad)}
+  .check.warn{border-color:rgba(255,180,84,.5)} .check.warn .v{color:var(--warn)}
+  .actions{display:flex;gap:10px;margin-top:16px}
+  button{cursor:pointer;border:none;border-radius:9px;padding:11px 18px;font-size:14px;font-weight:600;font-family:inherit}
+  button.primary{background:var(--accent);color:#04121f}
+  button.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .disclaimer{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+  .err{color:var(--bad);font-size:12.5px;margin-top:8px;min-height:1em}
+  .pill{display:inline-block;font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 7px;margin-left:6px}
+  .udl{background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:11px 14px;margin-top:6px;font-size:13px}
+  .udl b{color:var(--txt)}
+  details{margin-top:10px} summary{cursor:pointer;color:var(--accent);font-size:13px}
+  .twoway{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Concrete Slab Deflection — AS 3600</h1>
+  <span class="sub">detailed deflection (Cl 8.5 / 9.3.3) · effective second moment of area · immediate + long-term · UDL over the span</span>
+</header>
+
+<div class="wrap">
+  <!-- INPUTS -->
+  <div>
+    <div class="card">
+      <h2>Project details</h2>
+      <div class="row">
+        <div class="field"><label>Company / certifier</label><input id="company" value="Mayfair"></div>
+        <div class="field"><label>Job / reference no.</label><input id="jobno" placeholder="e.g. G9544"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Project / element</label><input id="project" placeholder="e.g. L1 suspended slab S1"></div>
+        <div class="field"><label>Project address</label><input id="address"></div>
+      </div>
+      <div class="row three">
+        <div class="field"><label>Prepared by</label><input id="author" placeholder="Name"></div>
+        <div class="field"><label>Role / reg. no.</label><input id="role" placeholder="e.g. Structural Eng."></div>
+        <div class="field"><label>Date</label><input id="rdate" type="date"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Member type &amp; span</h2>
+      <div class="row three">
+        <div class="field">
+          <label>Member type</label>
+          <select id="member"><option value="oneway">One-way slab (1 m strip)</option><option value="twoway">Two-way slab (strip method)</option><option value="beam">Beam (rectangular)</option></select>
+        </div>
+        <div class="field">
+          <label>Support condition</label>
+          <select id="support">
+            <option value="ss">Simply supported</option>
+            <option value="prop">One end continuous</option>
+            <option value="fix">Both ends continuous</option>
+            <option value="cant">Cantilever</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Effective span L<sub>ef</sub> (m)</label>
+          <input id="Lef" type="number" step="any" value="4.0">
+          <div class="hint">Lesser of (L<sub>n</sub>+D) and centre-to-centre (Cl 8.7 / 9.5.4).</div>
+        </div>
+      </div>
+      <div class="row three twoway" id="twowayRow">
+        <div class="field"><label>Short span L<sub>x</sub> (m)</label><input id="Lx" type="number" step="any" value="4.0"><div class="hint">Design span (deflection governs).</div></div>
+        <div class="field"><label>Long span L<sub>y</sub> (m)</label><input id="Ly" type="number" step="any" value="6.0"></div>
+        <div class="field"><label>Load share to short span</label><input id="gamma" type="number" step="any" value=""><div class="hint">Blank = auto Ly⁴/(Lx⁴+Ly⁴).</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Section &amp; reinforcement</h2>
+      <div class="row three">
+        <div class="field"><label>Width b (mm)</label><input id="b" type="number" step="any" value="1000"><div class="hint">1000 for a slab strip.</div></div>
+        <div class="field"><label>Overall depth D (mm)</label><input id="D" type="number" step="any" value="200"></div>
+        <div class="field"><label>Effective depth d (mm)</label><input id="d" type="number" step="any" value="170"><div class="hint">To tension steel centroid.</div></div>
+      </div>
+      <div class="row three">
+        <div class="field"><label>Tension steel A<sub>st</sub> (mm²)</label><input id="Ast" type="number" step="any" value="565"><div class="hint">Per strip width (e.g. N12@200 ≈ 565/m).</div></div>
+        <div class="field"><label>Compression steel A<sub>sc</sub> (mm²)</label><input id="Asc" type="number" step="any" value="0"></div>
+        <div class="field"><label>Comp. steel depth d′ (mm)</label><input id="dc" type="number" step="any" value="30"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Materials</h2>
+      <div class="row three">
+        <div class="field"><label>f′<sub>c</sub> (MPa)</label><input id="fc" type="number" step="any" value="32"></div>
+        <div class="field"><label>Concrete E<sub>c</sub> (MPa)</label><input id="Ec" type="number" step="any" value=""><div class="hint">Blank = AS 3600 Table 3.1.2 value.</div></div>
+        <div class="field"><label>Steel E<sub>s</sub> (MPa)</label><input id="Es" type="number" step="any" value="200000"></div>
+      </div>
+      <div class="row three">
+        <div class="field"><label>Unit weight (kN/m³)</label><input id="uw" type="number" step="any" value="24"><div class="hint">For self-weight.</div></div>
+        <div class="field"><label>Shrinkage stress σ<sub>cs</sub> (MPa)</label><input id="scs" type="number" step="any" value="0"><div class="hint">Reduces M<sub>cr</sub> (Cl 8.5.3.1). 0 = unconservative.</div></div>
+        <div class="field"><label>Density ρ (kg/m³)</label><input id="rho" type="number" step="any" value="2400"><div class="hint">For E<sub>c</sub> formula.</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Loads — UDL over the span</h2>
+      <div class="row three">
+        <div class="field"><label>Dead/superimposed G <span id="loadUnit1">(kPa)</span></label><input id="G" type="number" step="any" value="1.5"><div class="hint">Excl. self-weight (added below).</div></div>
+        <div class="field"><label>Live / imposed Q <span id="loadUnit2">(kPa)</span></label><input id="Q" type="number" step="any" value="2.0"></div>
+        <div class="field"><label>Include self-weight</label><select id="sw"><option value="1">Yes</option><option value="0">No</option></select></div>
+      </div>
+      <div class="row three">
+        <div class="field"><label>ψ<sub>s</sub> short-term factor</label><input id="psis" type="number" step="any" value="0.7"><div class="hint">AS 1170.0 Table 4.1.</div></div>
+        <div class="field"><label>ψ<sub>l</sub> long-term factor</label><input id="psil" type="number" step="any" value="0.4"></div>
+        <div class="field"><label>Deflection limit</label>
+          <select id="limit"><option value="250">Span/250 (total, appearance)</option><option value="500">Span/500 (brittle, movement provision)</option><option value="1000">Span/1000 (brittle, no provision)</option><option value="custom">Custom ratio…</option></select>
+        </div>
+      </div>
+      <div class="row" id="customRow" style="display:none">
+        <div class="field"><label>Custom limit ratio (span / N)</label><input id="limitN" type="number" step="any" value="300"></div>
+      </div>
+      <div class="udl" id="udlBox">—</div>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div>
+    <div class="sticky">
+      <div class="card">
+        <div class="result-head">
+          <span id="verdict" class="badge idle">Awaiting valid inputs</span>
+          <span style="color:var(--muted);font-size:12.5px" id="verdictSub"></span>
+        </div>
+        <div id="checks"></div>
+        <table class="out" id="outTable"><tbody></tbody></table>
+        <div class="actions">
+          <button class="primary" id="pdfBtn" disabled>Download Comps</button>
+          <button class="ghost" id="resetBtn">Reset</button>
+        </div>
+        <details><summary>Method &amp; assumptions</summary>
+          <div class="hint" style="margin-top:8px">
+            Detailed deflection to AS 3600 Cl 8.5.3 / 9.3.3. Section cracked-transformed properties give I<sub>cr</sub>;
+            M<sub>cr</sub> = (0.6√f′<sub>c</sub> − σ<sub>cs</sub>)·Z. Effective stiffness by Branson:
+            I<sub>ef</sub> = I<sub>cr</sub> + (I<sub>g</sub>−I<sub>cr</sub>)(M<sub>cr</sub>/M<sub>s</sub>)³ ≤ I<sub>ef,max</sub>
+            (I<sub>g</sub> if A<sub>st</sub>/bd ≥ 0.005, else 0.6 I<sub>g</sub>). Immediate δ = β·w·L<sub>ef</sub>⁴/(E<sub>c</sub>I<sub>ef</sub>);
+            long-term adds k<sub>cs</sub>·δ<sub>sustained</sub>, k<sub>cs</sub> = 2 − 1.2(A<sub>sc</sub>/A<sub>st</sub>) ≥ 0.8.
+            Continuous members use span-region M<sub>s</sub>; AS 3600 permits averaging I<sub>ef</sub>. Two-way uses a short-span
+            strip with a load-share factor — a simplified idealisation; verify important slabs by rigorous/FE analysis.
+          </div>
+        </details>
+        <div class="disclaimer">
+          Calculation aid only. Verify all inputs, the σ<sub>cs</sub> shrinkage stress, the effective span and the load
+          factors against AS 3600-2018, AS 1170 and project documentation. The responsible engineer remains accountable;
+          outputs do not constitute design certification.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+const fmt = (x,dp=2) => (x===null||x===undefined||!isFinite(x)) ? "—" : Number(x).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp});
+$("rdate").valueAsDate = new Date();
+
+// AS 3600 Table 3.1.2 mean Ec by grade (MPa)
+const EC_TABLE = {20:24000,25:26700,32:30100,40:32800,50:34800,65:37400,80:39600,100:42200};
+function ecDefault(fc, rho){
+  const grades=Object.keys(EC_TABLE).map(Number).sort((a,b)=>a-b);
+  if(EC_TABLE[fc]) return EC_TABLE[fc];
+  // interpolate the table (table is for rho=2400); scale by (rho/2400)^1.5
+  let lo=grades[0], hi=grades[grades.length-1];
+  for(let i=0;i<grades.length-1;i++){ if(fc>=grades[i]&&fc<=grades[i+1]){ lo=grades[i]; hi=grades[i+1]; break; } }
+  const t=(hi===lo)?0:(fc-lo)/(hi-lo);
+  const ec2400=EC_TABLE[lo]+t*(EC_TABLE[hi]-EC_TABLE[lo]);
+  return ec2400*Math.pow((rho||2400)/2400,1.5);
+}
+
+// support coefficients: beta (deflection), am (moment used for Ief), label
+const SUPPORT = {
+  ss:  {beta:5/384,  am:1/8,    label:"Simply supported"},
+  prop:{beta:1/185,  am:9/128,  label:"One end continuous"},
+  fix: {beta:1/384,  am:1/24,   label:"Both ends continuous"},
+  cant:{beta:1/8,    am:1/2,    label:"Cantilever"}
+};
+
+// UI wiring
+function syncMember(){
+  const m=$("member").value;
+  $("twowayRow").style.display = m==="twoway" ? "grid" : "none";
+  const unit = m==="beam" ? "(kN/m)" : "(kPa)";
+  $("loadUnit1").textContent=unit; $("loadUnit2").textContent=unit;
+  if(m!=="beam" && parseFloat($("b").value)!==1000 && (m==="oneway"||m==="twoway")) {} // leave b editable
+}
+$("member").addEventListener("change",()=>{ syncMember(); calc(); });
+$("limit").addEventListener("change",()=>{ $("customRow").style.display=$("limit").value==="custom"?"grid":"none"; calc(); });
+document.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",calc));
+$("resetBtn").addEventListener("click",()=>location.reload());
+syncMember();
+
+let LAST=null;
+function calc(){
+  $("err").textContent="";
+  const member=$("member").value, sup=$("support").value, S=SUPPORT[sup];
+  const beam = member==="beam";
+  let Lef=num("Lef");
+  // two-way: design span = Lx
+  let gamma=1;
+  if(member==="twoway"){
+    const Lx=num("Lx"), Ly=num("Ly");
+    if(Lx&&Ly){ Lef=Lx; const g=num("gamma"); gamma = (g!==null&&g>0&&g<=1)? g : Math.pow(Ly,4)/(Math.pow(Lx,4)+Math.pow(Ly,4)); }
+  }
+  const b=num("b"), D=num("D"), d=num("d"), Ast=num("Ast"), Asc=num("Asc")||0, dc=num("dc")||0;
+  const fc=num("fc"); let Ec=num("Ec"); const Es=num("Es")||200000;
+  const uw=num("uw")||0, scs=num("scs")||0, rho=num("rho")||2400;
+  const G=num("G"), Q=num("Q"); const psis=num("psis"); const psil=num("psil");
+  const incSW=$("sw").value==="1";
+
+  const need=[];
+  if(!Lef||Lef<=0)need.push("span");
+  if(!b||b<=0)need.push("width b"); if(!D||D<=0)need.push("depth D"); if(!d||d<=0)need.push("eff depth d");
+  if(!Ast||Ast<=0)need.push("Ast"); if(!fc||fc<=0)need.push("f'c");
+  if(G===null)need.push("G"); if(Q===null)need.push("Q"); if(psis===null)need.push("ψs"); if(psil===null)need.push("ψl");
+  if(need.length){ setIdle("Enter: "+need.join(", ")); return; }
+  if(d>=D){ setIdle("Effective depth d must be less than overall depth D."); return; }
+
+  if(Ec===null||Ec<=0) Ec=ecDefault(fc,rho);
+  const n=Es/Ec;
+  const Lmm=Lef*1000;
+
+  // --- loads to a line UDL on the analysis strip/member (kN/m) ---
+  // self-weight
+  const swArea = uw*(D/1000);                 // kPa (kN/m²) for slab, or kN/m² for beam tributary handled by user
+  let Gtot, Qtot, areaToLine;
+  if(beam){ // G,Q already kN/m line loads; self-weight = uw*b*D
+    const swLine = uw*(b/1000)*(D/1000);      // kN/m
+    Gtot=(G||0)+(incSW?swLine:0); Qtot=(Q||0); areaToLine=1;
+  } else { // slab: kPa over a 1 m wide strip -> kN/m on strip = kPa*1m ; two-way applies load share
+    Gtot=((G||0)+(incSW?swArea:0)); Qtot=(Q||0); areaToLine=1; // per metre width
+    Gtot*=gamma; Qtot*=gamma;
+  }
+  // serviceability load cases (kN/m on the member)
+  const w_short = Gtot + psis*Qtot;           // immediate / short-term
+  const w_sus   = Gtot + psil*Qtot;           // sustained / long-term
+  // to N/mm: 1 kN/m = 1 N/mm
+  const ws=w_short, wl=w_sus;
+
+  // --- section properties (mm units) ---
+  const Ig = b*Math.pow(D,3)/12;              // gross
+  const yt = D/2;
+  const Z  = Ig/yt;
+  const fctf = 0.6*Math.sqrt(fc);
+  const Mcr = Math.max(0,(fctf - scs)*Z);     // N·mm
+  // cracked transformed neutral axis (with comp steel)
+  const A=b/2, Bq=(n-1)*Asc + n*Ast, Cq=-((n-1)*Asc*dc + n*Ast*d);
+  const dn=(-Bq+Math.sqrt(Bq*Bq-4*A*Cq))/(2*A);
+  const Icr = b*Math.pow(dn,3)/3 + (n-1)*Asc*Math.pow(dn-dc,2) + n*Ast*Math.pow(d-dn,2);
+  const p = Ast/(b*d);
+  const IefMax = p>=0.005 ? Ig : 0.6*Ig;
+
+  // service moments (N·mm): Ms = am * w * Lef^2 ; w in N/mm, Lef in mm -> N·mm
+  const Ms_short = S.am*ws*Lmm*Lmm;
+  const Ms_sus   = S.am*wl*Lmm*Lmm;
+  function ief(Ms){ if(Ms<=Mcr) return IefMax; const r=Mcr/Ms; return Math.min(Icr+(Ig-Icr)*Math.pow(r,3), IefMax); }
+  const Ief_short=ief(Ms_short), Ief_sus=ief(Ms_sus);
+
+  // deflections (mm): δ = beta * w * Lef^4 / (Ec*Ief)
+  const di_short = S.beta*ws*Math.pow(Lmm,4)/(Ec*Ief_short);  // immediate, short-term service
+  const di_sus   = S.beta*wl*Math.pow(Lmm,4)/(Ec*Ief_sus);    // immediate, sustained
+  const kcs = Math.max(0.8, 2 - 1.2*(Asc/Ast));
+  const d_long = kcs*di_sus;                                  // long-term creep+shrinkage of sustained
+  const d_total = di_short + d_long;                          // total long-term deflection
+
+  // limit
+  const ratio = $("limit").value==="custom" ? (num("limitN")||250) : parseFloat($("limit").value);
+  const d_allow = Lmm/ratio;
+
+  const cracked = Ms_short>Mcr;
+  const pass = d_total<=d_allow;
+
+  const o={member,memberLabel:({oneway:"One-way slab",twoway:"Two-way slab",beam:"Beam"})[member],
+    supLabel:S.label, beta:S.beta, am:S.am, Lef, gamma, b,D,d,Ast,Asc,dc,fc,Ec,Es,n,uw,scs,rho,
+    G,Q,psis,psil,incSW, Gtot,Qtot,w_short,w_sus,
+    Ig,Icr,Z,yt,fctf,Mcr:Mcr/1e6,Ms_short:Ms_short/1e6,Ms_sus:Ms_sus/1e6,dn,p,IefMax,Ief_short,Ief_sus,
+    di_short,di_sus,kcs,d_long,d_total,ratio,d_allow,cracked,pass};
+  LAST=o; render(o);
+}
+
+function setIdle(msg){
+  LAST=null;
+  $("verdict").className="badge idle"; $("verdict").textContent="Awaiting valid inputs"; $("verdictSub").textContent="";
+  $("checks").innerHTML=""; $("outTable").querySelector("tbody").innerHTML=""; $("udlBox").textContent="—"; $("pdfBtn").disabled=true;
+  if(msg)$("err").textContent=msg;
+}
+
+function render(o){
+  $("udlBox").innerHTML = `Service UDL on the ${o.member==="beam"?"beam":"1 m strip"}`+(o.member==="twoway"?` (×${fmt(o.gamma,2)} load share)`:``)+
+    `: short-term <b>${fmt(o.w_short,2)} kN/m</b> (G+ψ<sub>s</sub>Q), sustained <b>${fmt(o.w_sus,2)} kN/m</b> (G+ψ<sub>l</sub>Q).`;
+
+  const v=$("verdict");
+  v.className="badge "+(o.pass?"pass":"fail");
+  v.textContent=o.pass?"DEFLECTION OK":"EXCEEDS LIMIT";
+  v.nextElementSibling.textContent = `δ = ${fmt(o.d_total,1)} mm vs L/${o.ratio} = ${fmt(o.d_allow,1)} mm`;
+
+  const chk=[];
+  chk.push(check(o.pass,"Total deflection ≤ limit", fmt(o.d_total,1)+" / "+fmt(o.d_allow,1)+" mm"));
+  chk.push(checkInfo(o.cracked?"Section cracked (Ms > Mcr)":"Section uncracked (Ms ≤ Mcr)", o.cracked?("Mcr "+fmt(o.Mcr,1)+" kNm"):("Mcr "+fmt(o.Mcr,1)+" kNm")));
+  if(o.scs===0) chk.push(checkWarn("σcs = 0 (shrinkage stress omitted)","raises Mcr — unconservative"));
+  $("checks").innerHTML=chk.join("");
+
+  const rows=[
+    ["hd","Member"],
+    ["",["Configuration", o.memberLabel+" — "+o.supLabel]],
+    ["",["Effective span Lef", fmt(o.Lef,2)+" m"]],
+    ["",["Design UDL (short-term)", fmt(o.w_short,2)+" kN/m"]],
+    ["hd","Section &amp; materials"],
+    ["",["Ec", fmt(o.Ec,0)+" MPa  (n="+fmt(o.n,1)+")"]],
+    ["",["Gross Ig", fmt(o.Ig/1e6,1)+" ×10⁶ mm⁴"]],
+    ["",["Cracked Icr  (dn="+fmt(o.dn,0)+" mm)", fmt(o.Icr/1e6,1)+" ×10⁶ mm⁴"]],
+    ["",["Cracking moment Mcr", fmt(o.Mcr,1)+" kNm"]],
+    ["",["Tension ratio p = Ast/bd", fmt(o.p*100,2)+" %  (Ief,max="+(o.IefMax===o.Ig?"Ig":"0.6Ig")+")"]],
+    ["hd","Effective stiffness"],
+    ["",["Service moment Ms (short)", fmt(o.Ms_short,1)+" kNm"]],
+    ["",["Ief (short-term)", fmt(o.Ief_short/1e6,1)+" ×10⁶ mm⁴"]],
+    ["",["Ief (sustained)", fmt(o.Ief_sus/1e6,1)+" ×10⁶ mm⁴"]],
+    ["hd","Deflection"],
+    ["",["Immediate δ (short-term)", fmt(o.di_short,1)+" mm"]],
+    ["",["Immediate δ (sustained)", fmt(o.di_sus,1)+" mm"]],
+    ["",["kcs (long-term factor)", fmt(o.kcs,2)]],
+    ["",["Long-term δ (kcs·δsus)", fmt(o.d_long,1)+" mm"]],
+    ["",["Total deflection δtotal", fmt(o.d_total,1)+" mm"]],
+    ["",["Allowable  L/"+o.ratio, fmt(o.d_allow,1)+" mm"]],
+  ];
+  $("outTable").querySelector("tbody").innerHTML = rows.map(r=>{
+    if(r[0]==="hd") return `<tr class="hd"><td colspan="2">${r[1]}</td></tr>`;
+    return `<tr><td class="k">${r[1][0]}</td><td>${r[1][1]}</td></tr>`;
+  }).join("");
+  $("pdfBtn").disabled=false;
+}
+function check(ok,l,v){return `<div class="check ${ok?'ok':'no'}"><span>${ok?'✓':'✗'} ${l}</span><span class="v">${v}</span></div>`;}
+function checkWarn(l,v){return `<div class="check warn"><span>⚠ ${l}</span><span class="v">${v}</span></div>`;}
+function checkInfo(l,v){return `<div class="check"><span>• ${l}</span><span class="v">${v}</span></div>`;}
+
+calc();
+
+/* ---------------- PDF ---------------- */
+function san(s){return String(s)
+  .replace(/Δ/g,"d").replace(/δ/g,"d").replace(/→/g,"->").replace(/−/g,"-").replace(/≥/g,">=").replace(/≤/g,"<=")
+  .replace(/≈/g,"~").replace(/×/g,"x").replace(/√/g,"sqrt").replace(/⁴/g,"^4").replace(/³/g,"^3").replace(/²/g,"^2")
+  .replace(/ψ/g,"psi").replace(/σ/g,"s").replace(/ρ/g,"rho").replace(/′/g,"'").replace(/⚠/g,"!")
+  .replace(/[\uD800-\uDFFF]/g,"")
+  .replace(/[Ͱ-Ͽ⅐-↏←-⇿∀-⋿⌀-➿]/g,"?");}
+
+$("pdfBtn").addEventListener("click",()=>{ if(!LAST) return; try{ buildPDF(LAST); }catch(e){ console.error(e); alert("PDF lib not loaded (needs internet first load); using print."); window.print(); } });
+
+function buildPDF(o){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm",format:"a4"});
+  const _t=doc.text.bind(doc); doc.text=function(s,...r){return _t(Array.isArray(s)?s.map(san):san(s),...r);};
+  const _s=doc.splitTextToSize.bind(doc); doc.splitTextToSize=function(s,...r){return _s(san(String(s)),...r);};
+  const _w=doc.getTextWidth.bind(doc); doc.getTextWidth=function(s){return _w(san(String(s)));};
+  const M=18,W=210,right=W-M; let y=M; const field=id=>($(id).value||"—"); const txt=(s,x,yy,opt)=>doc.text(String(s),x,yy,opt);
+
+  let titleX=M;
+  if(window.MAYFAIR_LOGO&&window.MAYFAIR_LOGO.dataUri){ const lw=40,lh=lw*window.MAYFAIR_LOGO.h/window.MAYFAIR_LOGO.w;
+    try{ doc.addImage(window.MAYFAIR_LOGO.dataUri,window.MAYFAIR_LOGO.type||"PNG",M,9,lw,lh); titleX=M+lw+6; }catch(e){} }
+  doc.setTextColor(20,28,38); doc.setFont("helvetica","bold"); doc.setFontSize(14);
+  txt(field("company")+" — Slab Deflection Check", titleX, 14);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(90,105,120);
+  txt("AS 3600 detailed deflection (Cl 8.5 / 9.3.3)", titleX, 19.5);
+  doc.setDrawColor(244,180,130); doc.setLineWidth(0.8); doc.line(M,24,W-M,24); doc.setLineWidth(0.2);
+  y=32; doc.setTextColor(20,28,38);
+
+  doc.setFillColor(o.pass?52:255,o.pass?199:92,o.pass?123:108);
+  doc.roundedRect(M,y-5,W-2*M,11,2,2,"F"); doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(255);
+  txt((o.pass?"DEFLECTION OK":"EXCEEDS LIMIT")+" — d="+fmt(o.d_total,1)+" mm vs L/"+o.ratio+" = "+fmt(o.d_allow,1)+" mm", M+4, y+2.5);
+  doc.setTextColor(20,28,38); y+=14;
+
+  y=kv(doc,"Project",[["Project / element",field("project")],["Job / ref.",field("jobno")],["Address",field("address")],["Date",field("rdate")],["Prepared by",field("author")],["Role / reg.",field("role")]],M,y,W);
+
+  y=tbl(doc,"1. Member, span & loads",[
+    ["Member type / support", o.memberLabel+" — "+o.supLabel],
+    ["Effective span  Lef", fmt(o.Lef,2)+" m"],
+    o.member==="twoway"?["Two-way load share to short span", fmt(o.gamma,2)+"  (Lx="+fmt(o.Lef,2)+" m)"]:null,
+    ["Dead/SI G  &  Live Q", fmt(o.G,2)+"  /  "+fmt(o.Q,2)+(o.member==="beam"?" kN/m":" kPa")+(o.incSW?"  (+ self-weight)":"")],
+    ["Serviceability factors", "psi_s="+fmt(o.psis,2)+", psi_l="+fmt(o.psil,2)],
+    ["UDL on member — short-term", fmt(o.w_short,2)+" kN/m   (G + psi_s.Q)"],
+    ["UDL on member — sustained", fmt(o.w_sus,2)+" kN/m   (G + psi_l.Q)"],
+  ].filter(Boolean),M,y,W);
+
+  y=tbl(doc,"2. Section & material properties",[
+    ["b x D, eff depth d", fmt(o.b,0)+" x "+fmt(o.D,0)+" mm,  d="+fmt(o.d,0)+" mm"],
+    ["Ast / Asc", fmt(o.Ast,0)+" / "+fmt(o.Asc,0)+" mm^2   (p="+fmt(o.p*100,2)+"%)"],
+    ["f'c  /  Ec  /  Es", fmt(o.fc,0)+" / "+fmt(o.Ec,0)+" / "+fmt(o.Es,0)+" MPa   (n="+fmt(o.n,1)+")"],
+    ["Flexural tensile f'ct.f = 0.6sqrt(f'c)", fmt(o.fctf,2)+" MPa"],
+    ["Shrinkage stress  σcs", fmt(o.scs,2)+" MPa"],
+    ["Gross Ig", fmt(o.Ig/1e6,1)+" x10^6 mm^4"],
+    ["Cracked Icr  (neutral axis dn)", fmt(o.Icr/1e6,1)+" x10^6 mm^4   (dn="+fmt(o.dn,0)+" mm)"],
+    ["Cracking moment Mcr=(f'ct.f-σcs)Z", fmt(o.Mcr,1)+" kNm"],
+  ],M,y,W);
+
+  y=tbl(doc,"3. Effective stiffness (Branson, Cl 8.5.3.1)",[
+    ["Service moment Ms (short / sustained)", fmt(o.Ms_short,1)+" / "+fmt(o.Ms_sus,1)+" kNm"],
+    ["Section state", o.cracked?"Cracked (Ms > Mcr)":"Uncracked (Ms <= Mcr)"],
+    ["Ief,max", (o.IefMax===o.Ig?"Ig (p>=0.005)":"0.6 Ig (p<0.005)")+" = "+fmt(o.IefMax/1e6,1)+" x10^6 mm^4"],
+    ["Ief short-term", fmt(o.Ief_short/1e6,1)+" x10^6 mm^4"],
+    ["Ief sustained", fmt(o.Ief_sus/1e6,1)+" x10^6 mm^4"],
+  ],M,y,W);
+
+  y=tbl(doc,"4. Deflection (Cl 8.5.3) — d = beta.w.Lef^4/(Ec.Ief)",[
+    ["Deflection coefficient beta", fmt(o.beta,5)+"  ("+o.supLabel+")"],
+    ["Immediate d (short-term)", fmt(o.di_short,2)+" mm"],
+    ["Immediate d (sustained)", fmt(o.di_sus,2)+" mm"],
+    ["kcs = 2 - 1.2(Asc/Ast) >= 0.8", fmt(o.kcs,2)],
+    ["Long-term d = kcs.d_sustained", fmt(o.d_long,2)+" mm"],
+    ["TOTAL deflection d_total", fmt(o.d_total,2)+" mm"],
+    ["Allowable  Lef / "+o.ratio, fmt(o.d_allow,2)+" mm"],
+  ],M,y,W);
+
+  // verdict line
+  y=ensure(doc,y,16,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5);
+  doc.setTextColor(o.pass?34:200,o.pass?150:40,o.pass?80:50);
+  txt((o.pass?"RESULT: COMPLIES":"RESULT: DOES NOT COMPLY")+" — total deflection "+fmt(o.d_total,1)+" mm "+(o.pass?"<=":">")+" allowable "+fmt(o.d_allow,1)+" mm (L/"+o.ratio+").",M,y);
+  doc.setTextColor(20,28,38); y+=7;
+
+  doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(110);
+  y=wrap(doc,"Notes: Branson effective-stiffness method per AS 3600 Cl 8.5.3.1; continuous members use the span-region service moment (AS 3600 permits averaging Ief). Two-way slabs use a short-span strip with a load-share factor — a simplified idealisation; verify by rigorous/FE analysis. Confirm sigma_cs (shrinkage), effective span, Ec, and AS 1170 load factors. g via standard formulas; this is a calculation aid, not design certification.",M,y,W-2*M,3.4);
+
+  y=ensure(doc,y+4,26,M); doc.setDrawColor(180); doc.line(M,y+9,M+70,y+9); doc.line(right-70,y+9,right,y+9);
+  doc.setFontSize(8.5); doc.setTextColor(90);
+  txt("Prepared by: "+field("author")+"  "+field("role"),M,y+14); txt("Date: "+field("rdate"),right-70,y+14);
+
+  doc.save((field("jobno")||"slab").replace(/[^\w -]+/g,"_").trim()+" - Comps.pdf");
+}
+function ensure(doc,y,need,M){ if(y+need>284){doc.addPage(); return M;} return y; }
+function wrap(doc,s,x,y,w,lh){ doc.splitTextToSize(String(s),w).forEach(l=>{y=ensure(doc,y,lh,18); doc.text(l,x,y); y+=lh;}); return y; }
+function kv(doc,title,pairs,M,y,W){
+  y=ensure(doc,y,14,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); doc.text(title,M,y); y+=5;
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5); const cw=(W-2*M)/2;
+  for(let i=0;i<pairs.length;i+=2){ y=ensure(doc,y,6,M);
+    [pairs[i],pairs[i+1]].forEach((p,j)=>{ if(!p)return; const x=M+j*cw; doc.setTextColor(120); doc.text(p[0]+":",x,y);
+      doc.setTextColor(20,28,38); const lb=doc.getTextWidth(p[0]+": "); doc.text(String(p[1]),x+lb+1,y); }); y+=5.4; }
+  return y+2;
+}
+function tbl(doc,title,rows,M,y,W){
+  y=ensure(doc,y,16,M); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor(20,28,38); doc.text(title,M,y); y+=4;
+  const x2=W-M; doc.setFontSize(9.3);
+  rows.forEach((r,i)=>{ y=ensure(doc,y,6,M);
+    if(i%2===0){ doc.setFillColor(244,247,250); doc.rect(M,y-3.4,W-2*M,5.6,"F"); }
+    doc.setFont("helvetica","normal"); doc.setTextColor(60); doc.text(String(r[0]),M+1.5,y);
+    doc.setFont("helvetica","bold"); doc.setTextColor(20,28,38); doc.text(String(r[1]),x2-1.5,y,{align:"right"}); y+=5.6; });
+  return y+3;
+}
+</script>
+</body>
+</html>
